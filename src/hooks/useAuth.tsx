@@ -58,40 +58,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Check for admin credentials
-    if (email === 'admin@gmail.com' && password === 'admin') {
-      // Create admin user if it doesn't exist
-      const { data: existingUser } = await supabase.auth.getUser();
-      if (!existingUser.user) {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: 'admin@gmail.com',
-          password: 'admin',
-          options: {
-            data: {
-              full_name: 'Administrator',
-            },
-          },
-        });
-        
-        if (signUpError && !signUpError.message.includes('already registered')) {
-          toast.error(signUpError.message);
-          return { error: signUpError };
-        }
-      }
-    }
-    
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     
     if (error) {
-      // If user doesn't exist and it's admin, try to sign up
-      if (error.message.includes('Invalid login credentials') && email === 'admin@gmail.com') {
+      // Special handling for admin credentials
+      if (error.message.includes('Invalid login credentials') && 
+          email === 'admin@gmail.com' && password === 'admin') {
         const { error: signUpError } = await supabase.auth.signUp({
           email: 'admin@gmail.com',
           password: 'admin',
           options: {
+            emailRedirectTo: `${window.location.origin}/`,
             data: {
               full_name: 'Administrator',
             },
@@ -99,11 +79,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         });
         
         if (signUpError) {
-          toast.error(signUpError.message);
-          return { error: signUpError };
+          // If user already exists, try to sign in again
+          if (signUpError.message.includes('already registered')) {
+            const { error: retryError } = await supabase.auth.signInWithPassword({
+              email: 'admin@gmail.com',
+              password: 'admin',
+            });
+            if (retryError) {
+              toast.error('Admin login failed. Please check credentials.');
+              return { error: retryError };
+            } else {
+              toast.success('Admin signed in successfully!');
+              return { error: null };
+            }
+          } else {
+            toast.error(signUpError.message);
+            return { error: signUpError };
+          }
         } else {
-          toast.success('Admin account created and signed in!');
-          return { error: null };
+          toast.success('Admin account created! Please check email to verify.');
+          return { error: signUpError };
         }
       } else {
         toast.error(error.message);
@@ -116,13 +111,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, fullName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: redirectUrl,
+        emailRedirectTo: `${window.location.origin}/`,
         data: {
           full_name: fullName,
         },
@@ -130,9 +123,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     
     if (error) {
-      toast.error(error.message);
+      if (error.message.includes('already registered')) {
+        toast.error('User already exists. Please sign in instead.');
+      } else {
+        toast.error(error.message);
+      }
     } else {
-      toast.success('Account created! Please check your email to verify.');
+      toast.success('Account created! You can now sign in.');
     }
     
     return { error };

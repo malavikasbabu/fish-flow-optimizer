@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import MapView from '@/components/MapView';
 import AIChat from '@/components/AIChat';
-import LanguageSelector from '@/components/LanguageSelector';
 import { Fish, TrendingUp, Truck, AlertCircle, MessageCircle, User } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -138,29 +137,16 @@ const NewDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Fish className="h-8 w-8 text-blue-600" />
-                {t('dashboard.title')}
-              </h1>
-              <p className="text-gray-600">Welcome back, {profile?.full_name || user.email}</p>
-            </div>
-            <div className="flex items-center gap-4">
-              <LanguageSelector />
-              <Button variant="outline" onClick={signOut}>
-                {t('nav.signOut')}
-              </Button>
-            </div>
-          </div>
-        </div>
-      </header>
-
+    <div className="bg-gradient-to-br from-blue-50 via-cyan-50 to-teal-50 min-h-screen">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Welcome Header */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Welcome back, {profile?.full_name || user.email?.split('@')[0]}!
+          </h1>
+          <p className="text-gray-600">Here's what's happening with your cold chain operations today.</p>
+        </div>
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
@@ -236,7 +222,7 @@ const NewDashboard = () => {
         </Card>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <Card>
             <CardHeader>
               <CardTitle className="text-lg">Data Entry</CardTitle>
@@ -274,21 +260,6 @@ const NewDashboard = () => {
           </Card>
         </div>
       </div>
-
-      {/* AI Chat Button */}
-      <Button
-        className="fixed bottom-4 right-4 rounded-full w-12 h-12 z-40"
-        onClick={() => setIsChatOpen(true)}
-      >
-        <MessageCircle className="h-6 w-6" />
-      </Button>
-
-      {/* AI Chat */}
-      <AIChat 
-        isOpen={isChatOpen} 
-        onClose={() => setIsChatOpen(false)}
-        context={dashboardData}
-      />
     </div>
   );
 };
