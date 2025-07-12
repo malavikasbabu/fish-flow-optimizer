@@ -50,7 +50,7 @@ export class OptimizationEngineV2 {
       'tuna': { unrefrigerated: 0.0313, refrigerated: 0.0104 },
     };
 
-    const rates = spoilageRates[fishType] || spoilageRates['tilapia'];
+    const rates = spoilageRates[fishType.toLowerCase()] || spoilageRates['tilapia'];
     const baseRate = isRefrigerated ? rates.refrigerated : rates.unrefrigerated;
     
     // Temperature adjustment (higher temperature increases spoilage)
@@ -73,7 +73,7 @@ export class OptimizationEngineV2 {
         supabase.from('markets').select('*').eq('active', true),
         supabase.from('trucks').select('*').eq('available', true),
         supabase.from('cold_storage').select('*').eq('active', true),
-        supabase.from('market_demand').select('*, markets(*)').eq('fish_type', params.fishType).gte('demand_date', new Date().toISOString().split('T')[0]),
+        supabase.from('market_demand').select('*, markets(*)').eq('fish_type', params.fishType as any).gte('demand_date', new Date().toISOString().split('T')[0]),
       ]);
 
       if (!ports || !markets || !trucks || !coldStorage || !marketDemand) {
@@ -269,12 +269,11 @@ export class OptimizationEngineV2 {
   async saveOptimizationResult(result: OptimizationResult, userId: string): Promise<void> {
     try {
       await supabase.from('optimization_results').insert({
-        user_id: userId,
         port_id: result.route.source.id,
         market_id: result.route.destination.id,
         cold_storage_id: result.route.coldStorage?.id || null,
         truck_id: result.truck.id,
-        fish_type: result.fishType,
+        fish_type: result.fishType as any,
         volume_kg: result.volume,
         distance_km: result.distance,
         travel_time_hours: result.travelTime,
@@ -283,6 +282,7 @@ export class OptimizationEngineV2 {
         total_cost: result.totalCost,
         net_profit: result.netProfit,
         route_data: result,
+        user_id: userId,
       });
     } catch (error) {
       console.error('Failed to save optimization result:', error);
