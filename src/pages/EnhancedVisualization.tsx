@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
@@ -475,7 +476,7 @@ const EnhancedVisualization = () => {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-600 mb-2">
-                  3 routes with >20% spoilage
+                  3 routes with {'>'}20% spoilage
                 </p>
                 <div className="space-y-1">
                   <p className="text-xs">• Sardine routes need refrigeration</p>
