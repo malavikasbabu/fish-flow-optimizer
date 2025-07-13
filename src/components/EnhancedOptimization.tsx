@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
@@ -11,6 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { MapPin, Truck, Calculator, TrendingUp, AlertTriangle } from 'lucide-react';
+import type { Database } from '@/integrations/supabase/types';
+
+type FishType = Database['public']['Enums']['fish_type'];
 
 interface OptimizationResult {
   route: string;
@@ -36,7 +38,7 @@ const EnhancedOptimization = () => {
   
   const [optimization, setOptimization] = useState({
     port_id: '',
-    fish_type: '',
+    fish_type: '' as FishType | '',
     volume_kg: '',
     use_cold_storage: false,
     max_distance: '1000'
@@ -92,7 +94,7 @@ const EnhancedOptimization = () => {
         market_id: data.market_id,
         cold_storage_id: data.cold_storage_id,
         truck_id: data.truck_id,
-        fish_type: optimization.fish_type,
+        fish_type: optimization.fish_type as FishType,
         volume_kg: parseInt(optimization.volume_kg),
         distance_km: data.distance,
         travel_time_hours: data.time,
@@ -153,7 +155,7 @@ const EnhancedOptimization = () => {
               <Label>Fish Type</Label>
               <Select
                 value={optimization.fish_type}
-                onValueChange={(value) => setOptimization(prev => ({ ...prev, fish_type: value }))}
+                onValueChange={(value) => setOptimization(prev => ({ ...prev, fish_type: value as FishType }))}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select fish type" />

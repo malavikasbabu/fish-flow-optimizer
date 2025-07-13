@@ -1,5 +1,7 @@
-
 import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+
+type FishType = Database['public']['Enums']['fish_type'];
 
 interface OptimizationParams {
   portId: string;
@@ -273,7 +275,7 @@ export class OptimizationEngineV2 {
         market_id: result.route.destination.id,
         cold_storage_id: result.route.coldStorage?.id || null,
         truck_id: result.truck.id,
-        fish_type: result.fishType as any,
+        fish_type: result.fishType as FishType,
         volume_kg: result.volume,
         distance_km: result.distance,
         travel_time_hours: result.travelTime,
@@ -281,7 +283,7 @@ export class OptimizationEngineV2 {
         revenue: result.revenue,
         total_cost: result.totalCost,
         net_profit: result.netProfit,
-        route_data: result,
+        route_data: result as any, // Cast to any for JSON compatibility
         user_id: userId,
       });
     } catch (error) {

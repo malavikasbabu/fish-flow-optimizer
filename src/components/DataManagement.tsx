@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
@@ -10,6 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Fish, Truck, Building2, Plus } from 'lucide-react';
+import type { Database } from '@/integrations/supabase/types';
+
+type FishType = Database['public']['Enums']['fish_type'];
 
 const DataManagement = () => {
   const { t } = useTranslation();
@@ -20,7 +22,7 @@ const DataManagement = () => {
   
   const [catchData, setCatchData] = useState({
     port_id: '',
-    fish_type: '',
+    fish_type: '' as FishType | '',
     volume_kg: '',
     quality_grade: 'Grade A',
     estimated_price_per_kg: '',
@@ -73,11 +75,14 @@ const DataManagement = () => {
       const { error } = await supabase
         .from('daily_catches')
         .insert({
-          ...catchData,
+          port_id: catchData.port_id,
           user_id: user.id,
           catch_date: new Date().toISOString().split('T')[0],
+          fish_type: catchData.fish_type as FishType,
           volume_kg: parseInt(catchData.volume_kg),
-          estimated_price_per_kg: parseFloat(catchData.estimated_price_per_kg)
+          quality_grade: catchData.quality_grade,
+          estimated_price_per_kg: parseFloat(catchData.estimated_price_per_kg),
+          weather_conditions: catchData.weather_conditions
         });
 
       if (error) throw error;
@@ -140,7 +145,7 @@ const DataManagement = () => {
                 <Label htmlFor="fish_type">Fish Type</Label>
                 <Select
                   value={catchData.fish_type}
-                  onValueChange={(value) => setCatchData(prev => ({ ...prev, fish_type: value }))}
+                  onValueChange={(value) => setCatchData(prev => ({ ...prev, fish_type: value as FishType }))}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select fish type" />
