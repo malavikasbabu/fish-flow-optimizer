@@ -1,482 +1,281 @@
+
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { CSVLink } from 'react-csv';
-import Papa from 'papaparse';
-import {
-  Database,
-  Download,
-  Upload,
-  Plus,
-  Edit,
-  Trash2,
-  RefreshCw,
-  MapPin,
-  Truck,
-  Building2,
-  Fish,
-  BarChart3
-} from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
+import { Fish, Truck, Building2, Plus } from 'lucide-react';
 
 const DataManagement = () => {
+  const { t } = useTranslation();
   const { user } = useAuth();
-  const [activeTab, setActiveTab] = useState('ports');
-  const [isLoading, setIsLoading] = useState(false);
-  const [editingItem, setEditingItem] = useState<any>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-
-  // Data states
-  const [ports, setPorts] = useState<any[]>([]);
-  const [markets, setMarkets] = useState<any[]>([]);
-  const [trucks, setTrucks] = useState<any[]>([]);
-  const [coldStorage, setColdStorage] = useState<any[]>([]);
-  const [marketDemand, setMarketDemand] = useState<any[]>([]);
+  const [ports, setPorts] = useState([]);
+  const [trucks, setTrucks] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const [catchData, setCatchData] = useState({
+    port_id: '',
+    fish_type: '',
+    volume_kg: '',
+    quality_grade: 'Grade A',
+    estimated_price_per_kg: '',
+    weather_conditions: ''
+  });
 
   useEffect(() => {
-    fetchAllData();
+    fetchPorts();
+    fetchTrucks();
   }, []);
 
-  const fetchAllData = async () => {
-    setIsLoading(true);
+  const fetchPorts = async () => {
     try {
-      const [
-        { data: portsData },
-        { data: marketsData },
-        { data: trucksData },
-        { data: coldStorageData },
-        { data: demandData },
-      ] = await Promise.all([
-        supabase.from('ports').select('*').order('name'),
-        supabase.from('markets').select('*').order('name'),
-        supabase.from('trucks').select('*').order('license_plate'),
-        supabase.from('cold_storage').select('*').order('name'),
-        supabase.from('market_demand').select('*, markets(name)').order('demand_date', { ascending: false }),
-      ]);
-
-      setPorts(portsData || []);
-      setMarkets(marketsData || []);
-      setTrucks(trucksData || []);
-      setColdStorage(coldStorageData || []);
-      setMarketDemand(demandData || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      toast.error('Failed to fetch data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleSave = async (tableName: string, data: any) => {
-    try {
-      if (editingItem?.id) {
-        // Update existing
-        const { error } = await supabase
-          .from(tableName)
-          .update(data)
-          .eq('id', editingItem.id);
-        
-        if (error) throw error;
-        toast.success('Item updated successfully');
-      } else {
-        // Create new
-        const { error } = await supabase
-          .from(tableName)
-          .insert(data);
-        
-        if (error) throw error;
-        toast.success('Item created successfully');
-      }
-      
-      setIsDialogOpen(false);
-      setEditingItem(null);
-      fetchAllData();
-    } catch (error: any) {
-      console.error('Error saving:', error);
-      toast.error(error.message || 'Failed to save item');
-    }
-  };
-
-  const handleDelete = async (tableName: string, id: string) => {
-    if (!confirm('Are you sure you want to delete this item?')) return;
-    
-    try {
-      const { error } = await supabase
-        .from(tableName)
-        .delete()
-        .eq('id', id);
+      const { data, error } = await supabase
+        .from('ports')
+        .select('*')
+        .eq('active', true)
+        .order('name');
       
       if (error) throw error;
-      toast.success('Item deleted successfully');
-      fetchAllData();
-    } catch (error: any) {
-      console.error('Error deleting:', error);
-      toast.error(error.message || 'Failed to delete item');
+      setPorts(data || []);
+    } catch (error) {
+      console.error('Error fetching ports:', error);
+      toast.error('Failed to load ports');
     }
   };
 
-  const handleImport = (file: File, tableName: string) => {
-    Papa.parse(file, {
-      header: true,
-      complete: async (results) => {
-        try {
-          const { error } = await supabase
-            .from(tableName)
-            .insert(results.data);
-          
-          if (error) throw error;
-          toast.success(`Imported ${results.data.length} items`);
-          fetchAllData();
-        } catch (error: any) {
-          console.error('Import error:', error);
-          toast.error(error.message || 'Failed to import data');
-        }
-      },
-      error: (error) => {
-        console.error('Parse error:', error);
-        toast.error('Failed to parse CSV file');
-      }
-    });
+  const fetchTrucks = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('trucks')
+        .select('*')
+        .eq('available', true)
+        .order('license_plate');
+      
+      if (error) throw error;
+      setTrucks(data || []);
+    } catch (error) {
+      console.error('Error fetching trucks:', error);
+      toast.error('Failed to load trucks');
+    }
   };
 
-  const PortsTable = () => (
-    <div className="space-y-4">
-      <div className="flex justify-between items-center">
-        <div className="flex items-center gap-2">
-          <MapPin className="h-5 w-5 text-blue-600" />
-          <h3 className="text-lg font-semibold">Ports Management</h3>
-          <Badge variant="secondary">{ports.length} ports</Badge>
-        </div>
-        <div className="flex gap-2">
-          <CSVLink data={ports} filename="ports.csv">
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              Export
-            </Button>
-          </CSVLink>
-          <input
-            type="file"
-            accept=".csv"
-            onChange={(e) => e.target.files?.[0] && handleImport(e.target.files[0], 'ports')}
-            className="hidden"
-            id="import-ports"
-          />
-          <Button variant="outline" size="sm" onClick={() => document.getElementById('import-ports')?.click()}>
-            <Upload className="h-4 w-4 mr-2" />
-            Import
-          </Button>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" onClick={() => { setEditingItem(null); setIsDialogOpen(true); }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Port
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{editingItem ? 'Edit Port' : 'Add New Port'}</DialogTitle>
-              </DialogHeader>
-              <PortForm onSave={(data) => handleSave('ports', data)} />
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
+  const handleSubmitCatch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Code</TableHead>
-            <TableHead>Location</TableHead>
-            <TableHead>Region</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {ports.map((port) => (
-            <TableRow key={port.id}>
-              <TableCell className="font-medium">{port.name}</TableCell>
-              <TableCell>{port.code}</TableCell>
-              <TableCell>{port.location_lat.toFixed(4)}, {port.location_lng.toFixed(4)}</TableCell>
-              <TableCell>{port.region}</TableCell>
-              <TableCell>
-                <Badge variant={port.active ? "default" : "secondary"}>
-                  {port.active ? "Active" : "Inactive"}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => { setEditingItem(port); setIsDialogOpen(true); }}
-                  >
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDelete('ports', port.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
+    setIsSubmitting(true);
+    try {
+      const { error } = await supabase
+        .from('daily_catches')
+        .insert({
+          ...catchData,
+          user_id: user.id,
+          catch_date: new Date().toISOString().split('T')[0],
+          volume_kg: parseInt(catchData.volume_kg),
+          estimated_price_per_kg: parseFloat(catchData.estimated_price_per_kg)
+        });
 
-  const PortForm = ({ onSave }: { onSave: (data: any) => void }) => {
-    const [formData, setFormData] = useState({
-      name: editingItem?.name || '',
-      code: editingItem?.code || '',
-      location_lat: editingItem?.location_lat || '',
-      location_lng: editingItem?.location_lng || '',
-      region: editingItem?.region || '',
-      state: editingItem?.state || '',
-      contact_person: editingItem?.contact_person || '',
-      phone: editingItem?.phone || '',
-      active: editingItem?.active ?? true,
-    });
+      if (error) throw error;
 
-    const handleSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      onSave({
-        ...formData,
-        location_lat: parseFloat(formData.location_lat),
-        location_lng: parseFloat(formData.location_lng),
+      toast.success('Catch data recorded successfully!');
+      setCatchData({
+        port_id: '',
+        fish_type: '',
+        volume_kg: '',
+        quality_grade: 'Grade A',
+        estimated_price_per_kg: '',
+        weather_conditions: ''
       });
-    };
-
-    return (
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="name">Port Name</Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="code">Port Code</Label>
-            <Input
-              id="code"
-              value={formData.code}
-              onChange={(e) => setFormData(prev => ({ ...prev, code: e.target.value }))}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="lat">Latitude</Label>
-            <Input
-              id="lat"
-              type="number"
-              step="any"
-              value={formData.location_lat}
-              onChange={(e) => setFormData(prev => ({ ...prev, location_lat: e.target.value }))}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="lng">Longitude</Label>
-            <Input
-              id="lng"
-              type="number"
-              step="any"
-              value={formData.location_lng}
-              onChange={(e) => setFormData(prev => ({ ...prev, location_lng: e.target.value }))}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="region">Region</Label>
-            <Input
-              id="region"
-              value={formData.region}
-              onChange={(e) => setFormData(prev => ({ ...prev, region: e.target.value }))}
-              required
-            />
-          </div>
-          <div>
-            <Label htmlFor="state">State</Label>
-            <Input
-              id="state"
-              value={formData.state}
-              onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
-              required
-            />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="contact">Contact Person</Label>
-            <Input
-              id="contact"
-              value={formData.contact_person}
-              onChange={(e) => setFormData(prev => ({ ...prev, contact_person: e.target.value }))}
-            />
-          </div>
-          <div>
-            <Label htmlFor="phone">Phone</Label>
-            <Input
-              id="phone"
-              value={formData.phone}
-              onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-            />
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
-            Cancel
-          </Button>
-          <Button type="submit">
-            {editingItem ? 'Update' : 'Create'} Port
-          </Button>
-        </div>
-      </form>
-    );
+    } catch (error) {
+      console.error('Error submitting catch data:', error);
+      toast.error('Failed to record catch data');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Database className="h-6 w-6 text-blue-600" />
-          <h2 className="text-2xl font-bold">Data Management</h2>
-        </div>
-        <Button onClick={fetchAllData} disabled={isLoading}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh All
-        </Button>
+    <div className="max-w-4xl mx-auto p-6 space-y-8">
+      <div className="text-center">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Data Management</h1>
+        <p className="text-gray-600">Record daily catch data and manage resources</p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
-          <TabsTrigger value="ports" className="flex items-center gap-2">
-            <MapPin className="h-4 w-4" />
-            Ports
-          </TabsTrigger>
-          <TabsTrigger value="markets" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Markets
-          </TabsTrigger>
-          <TabsTrigger value="trucks" className="flex items-center gap-2">
-            <Truck className="h-4 w-4" />
-            Trucks
-          </TabsTrigger>
-          <TabsTrigger value="storage" className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            Cold Storage
-          </TabsTrigger>
-          <TabsTrigger value="demand" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Market Demand
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="ports">
-          <Card>
-            <CardContent className="p-6">
-              <PortsTable />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="markets">
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Markets Management</h3>
-                <p className="text-gray-600">Manage market locations and demand data</p>
-                <Button className="mt-4">Add Market</Button>
+      {/* Daily Catch Entry */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Fish className="h-5 w-5 text-blue-600" />
+            <span>Daily Catch Entry</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmitCatch} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="port">Fishing Port</Label>
+                <Select
+                  value={catchData.port_id}
+                  onValueChange={(value) => setCatchData(prev => ({ ...prev, port_id: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a port" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ports.map((port: any) => (
+                      <SelectItem key={port.id} value={port.id}>
+                        {port.name} ({port.code})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        <TabsContent value="trucks">
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <Truck className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Fleet Management</h3>
-                <p className="text-gray-600">Manage truck fleet and availability</p>
-                <Button className="mt-4">Add Truck</Button>
+              <div className="space-y-2">
+                <Label htmlFor="fish_type">Fish Type</Label>
+                <Select
+                  value={catchData.fish_type}
+                  onValueChange={(value) => setCatchData(prev => ({ ...prev, fish_type: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select fish type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="tilapia">Tilapia</SelectItem>
+                    <SelectItem value="pomfret">Pomfret</SelectItem>
+                    <SelectItem value="mackerel">Mackerel</SelectItem>
+                    <SelectItem value="sardine">Sardine</SelectItem>
+                    <SelectItem value="tuna">Tuna</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        <TabsContent value="storage">
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Cold Storage Management</h3>
-                <p className="text-gray-600">Manage cold storage facilities and capacity</p>
-                <Button className="mt-4">Add Storage Facility</Button>
+              <div className="space-y-2">
+                <Label htmlFor="volume">Volume (kg)</Label>
+                <Input
+                  id="volume"
+                  type="number"
+                  value={catchData.volume_kg}
+                  onChange={(e) => setCatchData(prev => ({ ...prev, volume_kg: e.target.value }))}
+                  placeholder="Enter volume in kg"
+                  required
+                />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
-        <TabsContent value="demand">
-          <Card>
-            <CardContent className="p-6">
-              <div className="text-center py-8">
-                <BarChart3 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Market Demand</h3>
-                <p className="text-gray-600">Manage market demand and pricing data</p>
-                <Button className="mt-4">Add Demand Entry</Button>
+              <div className="space-y-2">
+                <Label htmlFor="price">Estimated Price per Kg (₹)</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={catchData.estimated_price_per_kg}
+                  onChange={(e) => setCatchData(prev => ({ ...prev, estimated_price_per_kg: e.target.value }))}
+                  placeholder="Enter price per kg"
+                />
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+
+              <div className="space-y-2">
+                <Label htmlFor="quality">Quality Grade</Label>
+                <Select
+                  value={catchData.quality_grade}
+                  onValueChange={(value) => setCatchData(prev => ({ ...prev, quality_grade: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Grade A">Grade A (Premium)</SelectItem>
+                    <SelectItem value="Grade B">Grade B (Standard)</SelectItem>
+                    <SelectItem value="Grade C">Grade C (Basic)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="weather">Weather Conditions</Label>
+                <Input
+                  id="weather"
+                  value={catchData.weather_conditions}
+                  onChange={(e) => setCatchData(prev => ({ ...prev, weather_conditions: e.target.value }))}
+                  placeholder="e.g., Clear, Cloudy, Rainy"
+                />
+              </div>
+            </div>
+
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isSubmitting || !catchData.port_id || !catchData.fish_type || !catchData.volume_kg}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {isSubmitting ? 'Recording...' : 'Record Catch Data'}
+            </Button>
+          </form>
+        </CardContent>
+      </Card>
+
+      {/* Available Resources Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Truck className="h-5 w-5 text-green-600" />
+              <span>Available Trucks</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {trucks.slice(0, 5).map((truck: any) => (
+                <div key={truck.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                  <span className="font-medium">{truck.license_plate}</span>
+                  <div className="text-sm text-gray-600">
+                    <span className={`px-2 py-1 rounded text-xs ${
+                      truck.truck_type === 'refrigerated' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {truck.truck_type}
+                    </span>
+                    <span className="ml-2">{truck.capacity_kg}kg</span>
+                  </div>
+                </div>
+              ))}
+              {trucks.length === 0 && (
+                <p className="text-gray-500 text-center py-4">No trucks available</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Building2 className="h-5 w-5 text-orange-600" />
+              <span>Nearby Ports</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {ports.slice(0, 5).map((port: any) => (
+                <div key={port.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
+                  <span className="font-medium">{port.name}</span>
+                  <div className="text-sm text-gray-600">
+                    <span className="px-2 py-1 bg-green-100 text-green-800 rounded text-xs">
+                      {port.region}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {ports.length === 0 && (
+                <p className="text-gray-500 text-center py-4">No ports available</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

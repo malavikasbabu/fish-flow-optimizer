@@ -1,194 +1,149 @@
+
 import { useState } from 'react';
-import { Link, useLocation } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Fish,
-  Home,
-  Route,
-  Map,
-  Package,
+import { 
+  Fish, 
+  User, 
+  LogOut, 
+  Menu, 
+  X,
   BarChart3,
+  MapPin,
   Settings,
-  MessageCircle,
-  User,
-  LogOut,
-  Bell,
-  Menu,
-  X
+  TrendingUp
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import LanguageSelector from './LanguageSelector';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 const TopNavigation = () => {
+  const { t } = useTranslation();
   const { user, signOut, profile } = useAuth();
-  const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const navigation = [
-    { name: 'Home', href: '/', icon: Home },
-    { name: 'Optimization', href: '/optimization', icon: Route },
-    { name: 'Routes Map', href: '/visualization', icon: Map },
-    { name: 'Inventory', href: '/input', icon: Package },
-    { name: 'Reports & KPIs', href: '/forecasting', icon: BarChart3 },
-    { name: 'Settings', href: '/simulation', icon: Settings },
+  const navigationItems = [
+    { path: '/', label: 'Dashboard', icon: BarChart3 },
+    { path: '/input', label: 'Data Entry', icon: Fish },
+    { path: '/optimization', label: 'Optimization', icon: MapPin },
+    { path: '/forecasting', label: 'Forecasting', icon: TrendingUp },
+    { path: '/visualization', label: 'Analytics', icon: BarChart3 },
   ];
 
-  const isActive = (href: string) => {
-    if (href === '/') {
-      return location.pathname === '/';
-    }
-    return location.pathname.startsWith(href);
+  const handleNavigation = (path: string) => {
+    navigate(path);
+    setIsMobileMenuOpen(false);
   };
 
-  const handleSignOut = async () => {
-    await signOut();
-  };
+  if (!user) {
+    return null;
+  }
 
   return (
-    <nav className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
+    <nav className="bg-white border-b border-gray-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
-          {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-600 p-2 rounded-lg">
-              <Fish className="h-6 w-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900">ColdChain Pro</h1>
-              <p className="text-xs text-gray-500 hidden sm:block">Marine Logistics Platform</p>
+          {/* Logo and Brand */}
+          <div className="flex items-center space-x-3">
+            <div className="flex items-center space-x-2">
+              <Fish className="h-8 w-8 text-blue-600" />
+              <span className="text-xl font-bold text-gray-900">ColdChain</span>
             </div>
           </div>
 
           {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-1">
-            {navigation.map((item) => {
+          <div className="hidden md:flex items-center space-x-8">
+            {navigationItems.map((item) => {
               const Icon = item.icon;
+              const isActive = location.pathname === item.path;
               return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={cn(
-                    "flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                    isActive(item.href)
-                      ? "bg-blue-100 text-blue-700"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                  )}
+                <button
+                  key={item.path}
+                  onClick={() => handleNavigation(item.path)}
+                  className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                    isActive
+                      ? 'text-blue-600 bg-blue-50'
+                      : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                  }`}
                 >
                   <Icon className="h-4 w-4" />
-                  {item.name}
-                </Link>
+                  <span>{item.label}</span>
+                </button>
               );
             })}
           </div>
 
-          {/* Right Side */}
-          <div className="flex items-center gap-3">
-            {/* Notifications */}
-            <Button variant="ghost" size="sm" className="relative">
-              <Bell className="h-4 w-4" />
-              <Badge className="absolute -top-1 -right-1 h-5 w-5 text-xs bg-red-500">
-                3
-              </Badge>
-            </Button>
-
-            {/* Language Selector */}
+          {/* Right side items */}
+          <div className="flex items-center space-x-4">
             <LanguageSelector />
-
-            {/* AI Assistant Trigger */}
-            <Button variant="ghost" size="sm">
-              <MessageCircle className="h-4 w-4" />
-              <span className="hidden sm:inline ml-2">AI Assistant</span>
-            </Button>
-
-            {/* User Menu */}
-            {user ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    <span className="hidden sm:inline">
-                      {profile?.full_name || user.email?.split('@')[0]}
-                    </span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <div className="px-2 py-1.5">
-                    <p className="text-sm font-medium">{profile?.full_name || 'User'}</p>
-                    <p className="text-xs text-gray-500">{user.email}</p>
-                    {profile?.role && (
-                      <Badge variant="secondary" className="text-xs mt-1">
-                        {profile.role}
-                      </Badge>
-                    )}
+            
+            {/* User Profile */}
+            <div className="flex items-center space-x-3">
+              <div className="flex items-center space-x-2">
+                <User className="h-5 w-5 text-gray-600" />
+                <div className="hidden sm:block">
+                  <div className="text-sm font-medium text-gray-900">
+                    {profile?.full_name || user.email?.split('@')[0]}
                   </div>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <User className="h-4 w-4 mr-2" />
-                    Profile Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <Settings className="h-4 w-4 mr-2" />
-                    Preferences
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleSignOut}>
-                    <LogOut className="h-4 w-4 mr-2" />
-                    Sign Out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <Link to="/auth">
-                <Button size="sm">Sign In</Button>
-              </Link>
-            )}
+                  <div className="flex items-center space-x-1">
+                    <Badge variant="secondary" className="text-xs">
+                      {profile?.role || 'operator'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={signOut}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <LogOut className="h-4 w-4" />
+                <span className="hidden sm:ml-2 sm:inline">Sign Out</span>
+              </Button>
+            </div>
 
-            {/* Mobile Menu Button */}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="lg:hidden"
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            >
-              {isMobileMenuOpen ? (
-                <X className="h-5 w-5" />
-              ) : (
-                <Menu className="h-5 w-5" />
-              )}
-            </Button>
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              >
+                {isMobileMenuOpen ? (
+                  <X className="h-5 w-5" />
+                ) : (
+                  <Menu className="h-5 w-5" />
+                )}
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Mobile Navigation */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-gray-200 py-4">
-            <div className="space-y-1">
-              {navigation.map((item) => {
+          <div className="md:hidden">
+            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-gray-200">
+              {navigationItems.map((item) => {
                 const Icon = item.icon;
+                const isActive = location.pathname === item.path;
                 return (
-                  <Link
-                    key={item.name}
-                    to={item.href}
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      isActive(item.href)
-                        ? "bg-blue-100 text-blue-700"
-                        : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                    )}
+                  <button
+                    key={item.path}
+                    onClick={() => handleNavigation(item.path)}
+                    className={`flex items-center space-x-2 w-full px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive
+                        ? 'text-blue-600 bg-blue-50'
+                        : 'text-gray-700 hover:text-blue-600 hover:bg-gray-50'
+                    }`}
                   >
                     <Icon className="h-4 w-4" />
-                    {item.name}
-                  </Link>
+                    <span>{item.label}</span>
+                  </button>
                 );
               })}
             </div>
