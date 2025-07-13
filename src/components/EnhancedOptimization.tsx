@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/hooks/useAuth';
@@ -225,14 +226,14 @@ const EnhancedOptimization = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-green-50 p-4 rounded-lg">
                     <div className="text-2xl font-bold text-green-600">
-                      ₹{result.profit.toLocaleString()}
+                      ₹{(result.profit || 0).toLocaleString()}
                     </div>
                     <div className="text-sm text-green-700">Net Profit</div>
                   </div>
                   
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <div className="text-2xl font-bold text-blue-600">
-                      {result.spoilage.toFixed(1)}%
+                      {(result.spoilage || 0).toFixed(1)}%
                     </div>
                     <div className="text-sm text-blue-700">Spoilage Rate</div>
                   </div>
@@ -241,19 +242,19 @@ const EnhancedOptimization = () => {
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600">Distance:</span>
-                    <span className="font-medium">{result.distance} km</span>
+                    <span className="font-medium">{result.distance || 0} km</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Travel Time:</span>
-                    <span className="font-medium">{result.time.toFixed(1)} hours</span>
+                    <span className="font-medium">{(result.time || 0).toFixed(1)} hours</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Revenue:</span>
-                    <span className="font-medium">₹{result.revenue.toLocaleString()}</span>
+                    <span className="font-medium">₹{(result.revenue || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600">Total Cost:</span>
-                    <span className="font-medium">₹{result.cost.toLocaleString()}</span>
+                    <span className="font-medium">₹{(result.cost || 0).toLocaleString()}</span>
                   </div>
                 </div>
 
@@ -262,18 +263,20 @@ const EnhancedOptimization = () => {
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <MapPin className="h-4 w-4 text-blue-600" />
-                      <span className="text-sm">{result.route}</span>
+                      <span className="text-sm">{result.route || 'No route available'}</span>
                     </div>
-                    <div className="flex items-center space-x-2">
-                      <Truck className="h-4 w-4 text-green-600" />
-                      <span className="text-sm">
-                        {result.truck?.license_plate} ({result.truck?.truck_type})
-                      </span>
-                    </div>
+                    {result.truck && (
+                      <div className="flex items-center space-x-2">
+                        <Truck className="h-4 w-4 text-green-600" />
+                        <span className="text-sm">
+                          {result.truck.license_plate} ({result.truck.truck_type})
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {result.spoilage > 15 && (
+                {(result.spoilage || 0) > 15 && (
                   <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-lg">
                     <div className="flex items-center space-x-2">
                       <AlertTriangle className="h-4 w-4 text-yellow-600" />
