@@ -19,9 +19,11 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     )
 
-    const { portId, fishType, volume, useColdStorage } = await req.json()
+    const { port_id, fish_type, volume_kg, use_cold_storage, max_distance } = await req.json()
 
-    // Fetch optimization data
+    console.log('Optimization request:', { port_id, fish_type, volume_kg, use_cold_storage, max_distance })
+
+    // Fetch all necessary data
     const [
       { data: ports },
       { data: markets },
@@ -35,73 +37,99 @@ serve(async (req) => {
       supabaseClient.from('trucks').select('*').eq('available', true),
       supabaseClient.from('cold_storage').select('*').eq('active', true),
       supabaseClient.from('spoilage_profiles').select('*'),
-      supabaseClient.from('market_demand').select('*, markets(*)').eq('fish_type', fishType)
+      supabaseClient.from('market_demand').select('*, markets(*)').eq('fish_type', fish_type).eq('demand_date', new Date().toISOString().split('T')[0])
     ])
 
-    // Advanced optimization logic would go here
-    // This is a simplified example
-    const results = []
-    const sourcePort = ports?.find(p => p.id === portId)
+    if (!ports || !markets || !trucks || !marketDemand) {
+      throw new Error('Failed to fetch required data')
+    }
+
+    const sourcePort = ports.find(p => p.id === port_id)
+    if (!sourcePort) {
+      throw new Error('Source port not found')
+    }
+
+    const spoilageProfile = spoilageProfiles?.find(s => s.fish_type === fish_type)
+    if (!spoilageProfile) {
+      throw new Error('Spoilage profile not found for fish type')
+    }
+
+    // Find viable routes
+    const viableRoutes = []
     
-    if (sourcePort && marketDemand) {
-      for (const demand of marketDemand) {
-        if (!demand.markets || !trucks) continue
+    for (const demand of marketDemand) {
+      if (!demand.markets) continue
+      
+      const market = demand.markets
+      const availableTrucks = trucks.filter(t => t.capacity_kg >= volume_kg)
+      
+      for (const truck of availableTrucks) {
+        // Calculate distance using Haversine formula
+        const distance = calculateDistance(
+          sourcePort.location_lat, sourcePort.location_lng,
+          market.location_lat, market.location_lng
+        )
         
-        const market = demand.markets
-        const availableTrucks = trucks.filter(t => t.capacity_kg >= volume)
+        if (distance > Math.min(truck.max_distance_km, max_distance)) continue
         
-        for (const truck of availableTrucks) {
-          // Calculate distance using Haversine formula
-          const distance = calculateDistance(
-            sourcePort.location_lat, sourcePort.location_lng,
-            market.location_lat, market.location_lng
-          )
-          
-          if (distance > truck.max_distance_km) continue
-          
-          const travelTime = distance / 60 // Assuming 60 km/hr
-          const spoilageProfile = spoilageProfiles?.find(s => s.fish_type === fishType)
-          
-          let spoilageRate = 0.05 // Default 5% spoilage
-          if (spoilageProfile) {
-            const maxHours = truck.truck_type === 'refrigerated' 
-              ? spoilageProfile.refrigerated_hours 
-              : spoilageProfile.unrefrigerated_hours
-            spoilageRate = Math.min(travelTime / maxHours, 1)
-          }
-          
-          const spoilagePercentage = spoilageRate * 100
-          const freshWeight = volume * (1 - spoilageRate)
-          const revenue = freshWeight * demand.price_per_kg
-          const transportCost = distance * truck.cost_per_km
-          const spoilageCost = (volume - freshWeight) * demand.price_per_kg
-          const totalCost = transportCost + spoilageCost
-          const netProfit = revenue - totalCost
-          
-          results.push({
-            route: {
-              source: sourcePort,
-              destination: market
-            },
-            truck,
-            distance,
-            travelTime,
-            spoilagePercentage,
-            revenue,
-            totalCost,
-            netProfit,
-            volume,
-            fishType
-          })
+        // Calculate travel time (assuming average speed of 50 km/hr)
+        const travelTime = distance / 50
+        
+        // Calculate spoilage based on truck type and travel time
+        const maxHours = truck.truck_type === 'refrigerated' 
+          ? spoilageProfile.refrigerated_hours 
+          : spoilageProfile.unrefrigerated_hours
+        
+        let spoilageRate = Math.min((travelTime / maxHours) * spoilageProfile.spoilage_rate_per_hour, 0.95)
+        
+        // Cold storage benefit
+        if (use_cold_storage && coldStorage && coldStorage.length > 0) {
+          spoilageRate = Math.max(spoilageRate - 0.05, 0.02) // 5% reduction, minimum 2%
         }
+        
+        const spoilagePercentage = spoilageRate * 100
+        const freshWeight = volume_kg * (1 - spoilageRate)
+        const revenue = freshWeight * demand.price_per_kg
+        const transportCost = distance * truck.cost_per_km
+        const spoilageCost = (volume_kg - freshWeight) * demand.price_per_kg * 0.5 // Loss cost
+        let coldStorageCost = 0
+        
+        if (use_cold_storage && coldStorage && coldStorage.length > 0) {
+          coldStorageCost = travelTime * coldStorage[0].cost_per_hour
+        }
+        
+        const totalCost = transportCost + spoilageCost + coldStorageCost
+        const netProfit = revenue - totalCost
+        
+        viableRoutes.push({
+          market_id: market.id,
+          cold_storage_id: use_cold_storage && coldStorage?.length > 0 ? coldStorage[0].id : null,
+          truck_id: truck.id,
+          distance,
+          time: travelTime,
+          spoilage: spoilagePercentage,
+          revenue,
+          cost: totalCost,
+          profit: netProfit,
+          route: `${sourcePort.name} → ${market.name}`,
+          truck: truck,
+          market: market
+        })
       }
     }
 
-    // Sort by net profit
-    results.sort((a, b) => b.netProfit - a.netProfit)
+    // Sort by profit and return the best option
+    viableRoutes.sort((a, b) => b.profit - a.profit)
+    const bestRoute = viableRoutes[0]
+
+    if (!bestRoute) {
+      throw new Error('No viable routes found')
+    }
+
+    console.log('Best route found:', bestRoute)
 
     return new Response(
-      JSON.stringify({ results }),
+      JSON.stringify(bestRoute),
       { 
         headers: { 
           ...corsHeaders, 
@@ -110,6 +138,7 @@ serve(async (req) => {
       },
     )
   } catch (error) {
+    console.error('Optimization error:', error)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 

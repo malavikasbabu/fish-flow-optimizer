@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { MapPin, Truck, Calculator, TrendingUp, AlertTriangle } from 'lucide-react';
+import { MapPin, Truck, Calculator, TrendingUp, AlertTriangle, Loader2 } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 
 type FishType = Database['public']['Enums']['fish_type'];
@@ -25,6 +25,9 @@ interface OptimizationResult {
   profit: number;
   truck: any;
   market: any;
+  market_id: string;
+  truck_id: string;
+  cold_storage_id?: string;
 }
 
 const EnhancedOptimization = () => {
@@ -58,23 +61,30 @@ const EnhancedOptimization = () => {
         supabase.from('cold_storage').select('*').eq('active', true)
       ]);
 
+      if (portsRes.error) throw portsRes.error;
+      if (marketsRes.error) throw marketsRes.error;
+      if (trucksRes.error) throw trucksRes.error;
+      if (coldRes.error) throw coldRes.error;
+
       setPorts(portsRes.data || []);
       setMarkets(marketsRes.data || []);
       setTrucks(trucksRes.data || []);
       setColdStorage(coldRes.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast.error('Failed to load optimization data');
+      toast.error(t('optimization.fetchError', 'Failed to load optimization data'));
     }
   };
 
   const runOptimization = async () => {
     if (!user || !optimization.port_id || !optimization.fish_type || !optimization.volume_kg) {
-      toast.error('Please fill in all required fields');
+      toast.error(t('optimization.validationError', 'Please fill in all required fields'));
       return;
     }
 
     setIsOptimizing(true);
+    console.log('Starting optimization with:', optimization);
+    
     try {
       const { data, error } = await supabase.functions.invoke('optimize-routes', {
         body: {
@@ -86,10 +96,15 @@ const EnhancedOptimization = () => {
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Optimization error:', error);
+        throw error;
+      }
 
-      // Save optimization result
-      await supabase.from('optimization_results').insert({
+      console.log('Optimization result:', data);
+
+      // Save optimization result to database
+      const { error: saveError } = await supabase.from('optimization_results').insert({
         user_id: user.id,
         port_id: optimization.port_id,
         market_id: data.market_id,
@@ -103,14 +118,20 @@ const EnhancedOptimization = () => {
         revenue: data.revenue,
         total_cost: data.cost,
         net_profit: data.profit,
-        route_data: data
+        route_data: data as any
       });
 
+      if (saveError) {
+        console.error('Error saving result:', saveError);
+        // Don't throw - the optimization worked, just saving failed
+        toast.error(t('optimization.saveError', 'Optimization completed but failed to save to history'));
+      }
+
       setResult(data);
-      toast.success('Optimization completed successfully!');
-    } catch (error) {
+      toast.success(t('optimization.success', 'Optimization completed successfully!'));
+    } catch (error: any) {
       console.error('Optimization error:', error);
-      toast.error('Optimization failed. Please try again.');
+      toast.error(t('optimization.error', `Optimization failed: ${error.message || 'Please try again'}`));
     } finally {
       setIsOptimizing(false);
     }
@@ -119,8 +140,12 @@ const EnhancedOptimization = () => {
   return (
     <div className="max-w-6xl mx-auto p-6 space-y-8">
       <div className="text-center">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Route Optimization</h1>
-        <p className="text-gray-600">Find the optimal delivery route for maximum profit</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          {t('optimization.title', 'Route Optimization')}
+        </h1>
+        <p className="text-gray-600">
+          {t('optimization.subtitle', 'Find the optimal delivery route for maximum profit')}
+        </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -129,23 +154,23 @@ const EnhancedOptimization = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <Calculator className="h-5 w-5 text-blue-600" />
-              <span>Optimization Parameters</span>
+              <span>{t('optimization.parameters', 'Optimization Parameters')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label>Source Port</Label>
+              <Label>{t('optimization.sourcePort', 'Source Port')}</Label>
               <Select
                 value={optimization.port_id}
                 onValueChange={(value) => setOptimization(prev => ({ ...prev, port_id: value }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select port" />
+                  <SelectValue placeholder={t('optimization.selectPort', 'Select port')} />
                 </SelectTrigger>
                 <SelectContent>
                   {ports.map((port: any) => (
                     <SelectItem key={port.id} value={port.id}>
-                      {port.name} ({port.code})
+                      {port.name} ({port.code}) - {port.state}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -153,41 +178,45 @@ const EnhancedOptimization = () => {
             </div>
 
             <div className="space-y-2">
-              <Label>Fish Type</Label>
+              <Label>{t('optimization.fishType', 'Fish Type')}</Label>
               <Select
                 value={optimization.fish_type}
                 onValueChange={(value) => setOptimization(prev => ({ ...prev, fish_type: value as FishType }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select fish type" />
+                  <SelectValue placeholder={t('optimization.selectFishType', 'Select fish type')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="tilapia">Tilapia</SelectItem>
-                  <SelectItem value="pomfret">Pomfret</SelectItem>
-                  <SelectItem value="mackerel">Mackerel</SelectItem>
-                  <SelectItem value="sardine">Sardine</SelectItem>
-                  <SelectItem value="tuna">Tuna</SelectItem>
+                  <SelectItem value="tilapia">{t('fish.tilapia', 'Tilapia')}</SelectItem>
+                  <SelectItem value="pomfret">{t('fish.pomfret', 'Pomfret')}</SelectItem>
+                  <SelectItem value="mackerel">{t('fish.mackerel', 'Mackerel')}</SelectItem>
+                  <SelectItem value="sardine">{t('fish.sardine', 'Sardine')}</SelectItem>
+                  <SelectItem value="tuna">{t('fish.tuna', 'Tuna')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Volume (kg)</Label>
+              <Label>{t('optimization.volume', 'Volume (kg)')}</Label>
               <Input
                 type="number"
                 value={optimization.volume_kg}
                 onChange={(e) => setOptimization(prev => ({ ...prev, volume_kg: e.target.value }))}
-                placeholder="Enter volume"
+                placeholder={t('optimization.enterVolume', 'Enter volume')}
+                min="1"
+                max="10000"
               />
             </div>
 
             <div className="space-y-2">
-              <Label>Maximum Distance (km)</Label>
+              <Label>{t('optimization.maxDistance', 'Maximum Distance (km)')}</Label>
               <Input
                 type="number"
                 value={optimization.max_distance}
                 onChange={(e) => setOptimization(prev => ({ ...prev, max_distance: e.target.value }))}
-                placeholder="Maximum delivery distance"
+                placeholder={t('optimization.maxDistancePlaceholder', 'Maximum delivery distance')}
+                min="100"
+                max="2000"
               />
             </div>
 
@@ -199,15 +228,24 @@ const EnhancedOptimization = () => {
                 onChange={(e) => setOptimization(prev => ({ ...prev, use_cold_storage: e.target.checked }))}
                 className="rounded"
               />
-              <Label htmlFor="cold_storage">Use Cold Storage (if beneficial)</Label>
+              <Label htmlFor="cold_storage">
+                {t('optimization.useColdStorage', 'Use Cold Storage (if beneficial)')}
+              </Label>
             </div>
 
             <Button 
               onClick={runOptimization}
               className="w-full"
-              disabled={isOptimizing || !optimization.port_id || !optimization.fish_type}
+              disabled={isOptimizing || !optimization.port_id || !optimization.fish_type || !optimization.volume_kg}
             >
-              {isOptimizing ? 'Optimizing...' : 'Run Optimization'}
+              {isOptimizing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  {t('optimization.optimizing', 'Optimizing...')}
+                </>
+              ) : (
+                t('optimization.runOptimization', 'Run Optimization')
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -217,7 +255,7 @@ const EnhancedOptimization = () => {
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
               <TrendingUp className="h-5 w-5 text-green-600" />
-              <span>Optimization Results</span>
+              <span>{t('optimization.results', 'Optimization Results')}</span>
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -228,38 +266,42 @@ const EnhancedOptimization = () => {
                     <div className="text-2xl font-bold text-green-600">
                       ₹{(result.profit || 0).toLocaleString()}
                     </div>
-                    <div className="text-sm text-green-700">Net Profit</div>
+                    <div className="text-sm text-green-700">
+                      {t('optimization.netProfit', 'Net Profit')}
+                    </div>
                   </div>
                   
                   <div className="bg-blue-50 p-4 rounded-lg">
                     <div className="text-2xl font-bold text-blue-600">
                       {(result.spoilage || 0).toFixed(1)}%
                     </div>
-                    <div className="text-sm text-blue-700">Spoilage Rate</div>
+                    <div className="text-sm text-blue-700">
+                      {t('optimization.spoilageRate', 'Spoilage Rate')}
+                    </div>
                   </div>
                 </div>
 
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Distance:</span>
-                    <span className="font-medium">{result.distance || 0} km</span>
+                    <span className="text-gray-600">{t('optimization.distance', 'Distance')}:</span>
+                    <span className="font-medium">{(result.distance || 0).toFixed(0)} km</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Travel Time:</span>
+                    <span className="text-gray-600">{t('optimization.travelTime', 'Travel Time')}:</span>
                     <span className="font-medium">{(result.time || 0).toFixed(1)} hours</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Revenue:</span>
+                    <span className="text-gray-600">{t('optimization.revenue', 'Revenue')}:</span>
                     <span className="font-medium">₹{(result.revenue || 0).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Total Cost:</span>
+                    <span className="text-gray-600">{t('optimization.totalCost', 'Total Cost')}:</span>
                     <span className="font-medium">₹{(result.cost || 0).toLocaleString()}</span>
                   </div>
                 </div>
 
                 <div className="border-t pt-4">
-                  <h4 className="font-semibold mb-2">Recommended Route:</h4>
+                  <h4 className="font-semibold mb-2">{t('optimization.recommendedRoute', 'Recommended Route')}:</h4>
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2">
                       <MapPin className="h-4 w-4 text-blue-600" />
@@ -269,7 +311,8 @@ const EnhancedOptimization = () => {
                       <div className="flex items-center space-x-2">
                         <Truck className="h-4 w-4 text-green-600" />
                         <span className="text-sm">
-                          {result.truck.license_plate} ({result.truck.truck_type})
+                          {result.truck.license_plate} ({t(`truck.${result.truck.truck_type}`, result.truck.truck_type)})
+                          - {result.truck.capacity_kg}kg capacity
                         </span>
                       </div>
                     )}
@@ -281,7 +324,7 @@ const EnhancedOptimization = () => {
                     <div className="flex items-center space-x-2">
                       <AlertTriangle className="h-4 w-4 text-yellow-600" />
                       <span className="text-sm text-yellow-800">
-                        High spoilage risk. Consider using refrigerated transport or cold storage.
+                        {t('optimization.highSpoilageWarning', 'High spoilage risk. Consider using refrigerated transport or cold storage.')}
                       </span>
                     </div>
                   </div>
@@ -289,7 +332,10 @@ const EnhancedOptimization = () => {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-500">Run optimization to see results</p>
+                <Calculator className="h-12 w-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-500">
+                  {t('optimization.runToSeeResults', 'Run optimization to see results')}
+                </p>
               </div>
             )}
           </CardContent>
