@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { Navigate } from 'react-router-dom';
@@ -320,7 +319,6 @@ const NewOptimization = () => {
                           </div>
                         </div>
 
-                        {/* Recommendations */}
                         {result.recommendations && result.recommendations.length > 0 && (
                           <div className="mt-3 p-2 bg-amber-50 rounded border border-amber-200">
                             <div className="flex items-center gap-1 text-amber-800 font-medium text-xs mb-1">
@@ -365,7 +363,7 @@ const NewOptimization = () => {
         <MessageCircle className="h-6 w-6" />
       </Button>
 
-      {/* AI Chat */}
+      {/* AI Chat Modal */}
       <AIChat 
         isOpen={isChatOpen} 
         onClose={() => setIsChatOpen(false)}

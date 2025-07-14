@@ -13,6 +13,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { Shield, Plus, Edit, Trash2, Save, Users, Truck, Building2, MapPin } from 'lucide-react';
 
+type TableName = 'ports' | 'markets' | 'trucks' | 'cold_storage' | 'profiles';
+
 const AdminDashboard = () => {
   const { t } = useTranslation();
   const { user, profile } = useAuth();
@@ -54,18 +56,18 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleSave = async (table: string, item: any) => {
+  const handleSave = async (tableName: TableName, item: any) => {
     try {
       if (item.id) {
         // Update existing
-        const { error } = await supabase.from(table).update(item).eq('id', item.id);
+        const { error } = await (supabase.from as any)(tableName).update(item).eq('id', item.id);
         if (error) throw error;
-        toast.success(`${table} updated successfully`);
+        toast.success(`${tableName} updated successfully`);
       } else {
         // Create new
-        const { error } = await supabase.from(table).insert(item);
+        const { error } = await (supabase.from as any)(tableName).insert(item);
         if (error) throw error;
-        toast.success(`${table} created successfully`);
+        toast.success(`${tableName} created successfully`);
       }
       
       setEditingItem(null);
@@ -77,13 +79,13 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleDelete = async (table: string, id: string) => {
+  const handleDelete = async (tableName: TableName, id: string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
 
     try {
-      const { error } = await supabase.from(table).delete().eq('id', id);
+      const { error } = await (supabase.from as any)(tableName).delete().eq('id', id);
       if (error) throw error;
-      toast.success(`${table} deleted successfully`);
+      toast.success(`${tableName} deleted successfully`);
       fetchAllData();
     } catch (error: any) {
       console.error('Delete error:', error);
@@ -99,16 +101,25 @@ const AdminDashboard = () => {
             <Shield className="h-16 w-16 text-gray-400 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Access Denied</h2>
             <p className="text-gray-600 mb-4">You need administrator privileges to access this page.</p>
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-gray-500 mb-4">
               Contact your system administrator to request admin access.
             </p>
+            <div className="bg-blue-50 p-4 rounded-lg text-left">
+              <h3 className="font-semibold text-blue-900 mb-2">To get admin access:</h3>
+              <ol className="text-sm text-blue-800 space-y-1">
+                <li>1. Go to Supabase SQL Editor</li>
+                <li>2. Run: <code className="bg-blue-100 px-2 py-1 rounded">SELECT promote_to_admin('your-email@example.com');</code></li>
+                <li>3. Replace with your actual email address</li>
+                <li>4. Refresh this page</li>
+              </ol>
+            </div>
           </CardContent>
         </Card>
       </div>
     );
   }
 
-  const renderTable = (data: any[], columns: string[], tableName: string) => (
+  const renderTable = (data: any[], columns: string[], tableName: TableName) => (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold capitalize">{tableName.replace('_', ' ')}</h3>
