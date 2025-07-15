@@ -58,11 +58,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    // Special handling for admin@321 credentials
-    if (email === 'admin@321' && password === 'admin@321') {
+    // Special handling for admin@gmail.com credentials
+    if (email === 'admin@gmail.com' && password === 'admin@123') {
       const { error: signUpError } = await supabase.auth.signUp({
-        email: 'admin@321',
-        password: 'admin@321',
+        email: 'admin@gmail.com',
+        password: 'admin@123',
         options: {
           emailRedirectTo: `${window.location.origin}/`,
           data: {
@@ -78,8 +78,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // Try to sign in after signup
       const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: 'admin@321',
-        password: 'admin@321',
+        email: 'admin@gmail.com',
+        password: 'admin@123',
       });
       
       if (signInError) {
@@ -97,45 +97,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     });
     
     if (error) {
-      // Special handling for admin credentials
-      if (error.message.includes('Invalid login credentials') && 
-          email === 'admin@gmail.com' && password === 'admin') {
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: 'admin@gmail.com',
-          password: 'admin',
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-            data: {
-              full_name: 'Administrator',
-            },
-          },
-        });
-        
-        if (signUpError) {
-          // If user already exists, try to sign in again
-          if (signUpError.message.includes('already registered')) {
-            const { error: retryError } = await supabase.auth.signInWithPassword({
-              email: 'admin@gmail.com',
-              password: 'admin',
-            });
-            if (retryError) {
-              toast.error('Admin login failed. Please check credentials.');
-              return { error: retryError };
-            } else {
-              toast.success('Admin signed in successfully!');
-              return { error: null };
-            }
-          } else {
-            toast.error(signUpError.message);
-            return { error: signUpError };
-          }
-        } else {
-          toast.success('Admin account created! Please check email to verify.');
-          return { error: signUpError };
-        }
-      } else {
-        toast.error(error.message);
-      }
+      toast.error(error.message);
     } else {
       toast.success('Welcome back!');
     }
