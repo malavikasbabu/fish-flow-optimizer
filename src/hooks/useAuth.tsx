@@ -58,6 +58,39 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const signIn = async (email: string, password: string) => {
+    // Special handling for admin@321 credentials
+    if (email === 'admin@321' && password === 'admin@321') {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: 'admin@321',
+        password: 'admin@321',
+        options: {
+          emailRedirectTo: `${window.location.origin}/`,
+          data: {
+            full_name: 'System Administrator',
+          },
+        },
+      });
+      
+      if (signUpError && !signUpError.message.includes('already registered')) {
+        toast.error(signUpError.message);
+        return { error: signUpError };
+      }
+      
+      // Try to sign in after signup
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: 'admin@321',
+        password: 'admin@321',
+      });
+      
+      if (signInError) {
+        toast.error(signInError.message);
+        return { error: signInError };
+      } else {
+        toast.success('Admin signed in successfully!');
+        return { error: null };
+      }
+    }
+
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
