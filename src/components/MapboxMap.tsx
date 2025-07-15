@@ -1,3 +1,4 @@
+
 import { useEffect, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -28,6 +29,7 @@ const MapboxMap = ({
 }: MapboxMapProps) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
   const [layerFilters, setLayerFilters] = useState({
     refrigerated: true,
@@ -52,6 +54,19 @@ const MapboxMap = ({
     // Add navigation controls
     map.current.addControl(new mapboxgl.NavigationControl(), 'top-right');
 
+    // Wait for style to load before allowing data to be added
+    map.current.on('style.load', () => {
+      console.log('Map style loaded');
+      setMapLoaded(true);
+    });
+
+    // Handle style data events for better reliability
+    map.current.on('styledata', () => {
+      if (map.current?.isStyleLoaded()) {
+        setMapLoaded(true);
+      }
+    });
+
     return () => {
       if (map.current) {
         map.current.remove();
@@ -60,11 +75,38 @@ const MapboxMap = ({
   }, []);
 
   useEffect(() => {
-    if (!map.current) return;
+    if (!map.current || !mapLoaded) return;
+
+    console.log('Adding map data to loaded map');
 
     // Clear existing markers and sources
     const existingMarkers = document.querySelectorAll('.mapbox-marker');
     existingMarkers.forEach(marker => marker.remove());
+
+    // Clear existing sources and layers
+    if (map.current.isStyleLoaded()) {
+      const layers = map.current.getStyle().layers || [];
+      layers.forEach(layer => {
+        if (layer.id.startsWith('route-')) {
+          try {
+            map.current!.removeLayer(layer.id);
+          } catch (e) {
+            console.warn('Failed to remove layer:', layer.id);
+          }
+        }
+      });
+
+      const sources = map.current.getStyle().sources || {};
+      Object.keys(sources).forEach(sourceId => {
+        if (sourceId.startsWith('route-')) {
+          try {
+            map.current!.removeSource(sourceId);
+          } catch (e) {
+            console.warn('Failed to remove source:', sourceId);
+          }
+        }
+      });
+    }
 
     // Add port markers
     ports.forEach((port) => {
@@ -153,70 +195,77 @@ const MapboxMap = ({
         .addTo(map.current!);
     });
 
-    // Add route lines
-    routes.forEach((route, index) => {
-      if (!route.route?.source || !route.route?.destination) return;
+    // Add route lines only if map is loaded and style is ready
+    if (map.current.isStyleLoaded()) {
+      routes.forEach((route, index) => {
+        if (!route.route?.source || !route.route?.destination) return;
 
-      const sourceId = `route-${index}`;
-      const spoilageColor = route.spoilagePercentage < 5 ? '#10b981' : 
-                           route.spoilagePercentage < 15 ? '#f59e0b' : '#ef4444';
+        const sourceId = `route-${index}`;
+        const spoilageColor = route.spoilagePercentage < 5 ? '#10b981' : 
+                             route.spoilagePercentage < 15 ? '#f59e0b' : '#ef4444';
 
-      // Create route line
-      if (!map.current!.getSource(sourceId)) {
-        map.current!.addSource(sourceId, {
-          type: 'geojson',
-          data: {
-            type: 'Feature',
-            properties: {
-              route: route,
-            },
-            geometry: {
-              type: 'LineString',
-              coordinates: [
-                [route.route.source.location_lng, route.route.source.location_lat],
-                [route.route.destination.location_lng, route.route.destination.location_lat],
-              ],
-            },
-          },
-        });
+        try {
+          // Create route line
+          if (!map.current!.getSource(sourceId)) {
+            map.current!.addSource(sourceId, {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                properties: {
+                  route: JSON.stringify(route),
+                },
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [
+                    [route.route.source.location_lng, route.route.source.location_lat],
+                    [route.route.destination.location_lng, route.route.destination.location_lat],
+                  ],
+                },
+              },
+            });
 
-        map.current!.addLayer({
-          id: sourceId,
-          type: 'line',
-          source: sourceId,
-          layout: {
-            'line-join': 'round',
-            'line-cap': 'round',
-          },
-          paint: {
-            'line-color': spoilageColor,
-            'line-width': 4,
-            'line-opacity': 0.8,
-          },
-        });
+            map.current!.addLayer({
+              id: sourceId,
+              type: 'line',
+              source: sourceId,
+              layout: {
+                'line-join': 'round',
+                'line-cap': 'round',
+              },
+              paint: {
+                'line-color': spoilageColor,
+                'line-width': 4,
+                'line-opacity': 0.8,
+              },
+            });
 
-        // Add click handler for route
-        map.current!.on('click', sourceId, (e) => {
-          if (e.features && e.features[0]) {
-            const routeData = e.features[0].properties?.route;
-            if (routeData) {
-              setSelectedRoute(JSON.parse(routeData));
-              onRouteClick?.(JSON.parse(routeData));
-            }
+            // Add click handler for route
+            map.current!.on('click', sourceId, (e) => {
+              if (e.features && e.features[0] && e.features[0].properties) {
+                const routeData = e.features[0].properties.route;
+                if (routeData) {
+                  const parsedRoute = JSON.parse(routeData);
+                  setSelectedRoute(parsedRoute);
+                  onRouteClick?.(parsedRoute);
+                }
+              }
+            });
+
+            // Change cursor on hover
+            map.current!.on('mouseenter', sourceId, () => {
+              map.current!.getCanvas().style.cursor = 'pointer';
+            });
+
+            map.current!.on('mouseleave', sourceId, () => {
+              map.current!.getCanvas().style.cursor = '';
+            });
           }
-        });
-
-        // Change cursor on hover
-        map.current!.on('mouseenter', sourceId, () => {
-          map.current!.getCanvas().style.cursor = 'pointer';
-        });
-
-        map.current!.on('mouseleave', sourceId, () => {
-          map.current!.getCanvas().style.cursor = '';
-        });
-      }
-    });
-  }, [ports, markets, coldStorage, routes, onRouteClick]);
+        } catch (error) {
+          console.warn('Failed to add route:', sourceId, error);
+        }
+      });
+    }
+  }, [ports, markets, coldStorage, routes, onRouteClick, mapLoaded]);
 
   const toggleLayer = (layer: keyof typeof layerFilters) => {
     setLayerFilters(prev => ({ ...prev, [layer]: !prev[layer] }));
@@ -231,6 +280,15 @@ const MapboxMap = ({
   return (
     <div className={`relative ${className}`}>
       <div ref={mapContainer} className="w-full h-full rounded-lg" />
+      
+      {!mapLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+            <p className="text-sm text-gray-600">Loading map...</p>
+          </div>
+        </div>
+      )}
       
       {/* Layer Controls */}
       <Card className="absolute top-4 right-4 w-64">
