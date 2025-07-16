@@ -4,7 +4,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DataSourceIndicator } from './DataSourceIndicator';
+import DataSourceIndicator from './DataSourceIndicator';
 
 // Public Mapbox token - replace with your own for production
 const MAPBOX_TOKEN = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
@@ -192,9 +192,13 @@ const RealRouteVisualization = ({
             </div>
           </CardTitle>
           <DataSourceIndicator 
-            dataType="real" 
-            description="Actual road routes from Mapbox Directions API"
-            details="Real-time routing with traffic considerations and turn-by-turn directions"
+            dataSources={[{
+              name: 'Route Data',
+              type: 'real',
+              description: 'Actual road routes from Mapbox Directions API',
+              source: 'Mapbox API',
+              lastUpdated: 'Real-time'
+            }]}
           />
         </CardHeader>
         <CardContent>

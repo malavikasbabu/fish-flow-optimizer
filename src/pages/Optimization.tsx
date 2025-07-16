@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { MapPin, Truck, Calculator, TrendingUp, AlertTriangle, Loader2, Play } from 'lucide-react';
-import { DataSourceIndicator } from '@/components/DataSourceIndicator';
+import DataSourceIndicator from '@/components/DataSourceIndicator';
 import MapboxMap from '@/components/MapboxMap';
 import AIChat from '@/components/AIChat';
 import type { Database } from '@/integrations/supabase/types';
@@ -165,9 +164,13 @@ const Optimization = () => {
             AI-powered logistics planning for maximum profit and minimum spoilage
           </p>
           <DataSourceIndicator 
-            dataType="calculated" 
-            description="Route optimization using real port, market, and truck data"
-            details="Calculations based on distance algorithms, spoilage rates, and market demand"
+            dataSources={[{
+              name: 'Route Optimization',
+              type: 'calculated',
+              description: 'Route optimization using real port, market, and truck data',
+              source: 'Custom optimization algorithm',
+              lastUpdated: 'Real-time calculation'
+            }]}
           />
         </div>
 
